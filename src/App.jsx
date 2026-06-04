@@ -121,7 +121,7 @@ function App() {
           <a href="#kontaktai" onClick={() => setMenuOpen(false)}>Kontaktai</a>
         </nav>
 
-        <a className="callBtn" href="tel:+37060000000">
+        <a className="callBtn" href="tel:+37064038274">
           <Phone size={18} /> Skambinti
         </a>
 
@@ -468,12 +468,12 @@ function App() {
             </div>
 
             <div className="contactInfo">
-              <a href="tel:+37060000000">
-                <Phone /> +370 600 00000
+              <a href="tel:+37064038274">
+                <Phone /> +370 640 38274
               </a>
 
-              <a href="mailto:info@autosupirkimas.lt">
-                <Mail /> info@autosupirkimas.lt
+              <a href="mailto:pirkparduokautolt@gmail.com">
+                <Mail /> pirkparduokautolt@gmail.com
               </a>
 
               <span>
@@ -488,7 +488,7 @@ function App() {
         </section>
       </main>
 
-      <a className="floatingPhone" href="tel:+37060000000">
+      <a className="floatingPhone" href="tel:+37064038274">
         <Phone />
       </a>
 
