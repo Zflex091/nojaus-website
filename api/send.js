@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import formidable from "formidable";
+import { IncomingForm } from "formidable";
 import fs from "fs";
 
 export const config = {
@@ -14,35 +14,51 @@ export default async function handler(req, res) {
   }
 
   try {
-    const form = formidable({
+    const form = new IncomingForm({
       multiples: true,
       maxFileSize: 10 * 1024 * 1024,
+      keepExtensions: true,
     });
 
     const [fields, files] = await form.parse(req);
 
-    const photos = files.photos || [];
-    const fileArray = Array.isArray(photos) ? photos : [photos];
+    const getValue = (value) => {
+      if (Array.isArray(value)) return value[0] || "";
+      return value || "";
+    };
 
-    const attachments = fileArray
-      .filter(Boolean)
-      .map((file) => ({
-        filename: file.originalFilename || "nuotrauka.jpg",
-        content: fs.createReadStream(file.filepath),
-      }));
+    const uploadedPhotos = files.photos
+      ? Array.isArray(files.photos)
+        ? files.photos
+        : [files.photos]
+      : [];
 
-    const getValue = (value) => Array.isArray(value) ? value[0] : value || "";
+    const attachments = uploadedPhotos.map((file, index) => ({
+      filename: file.originalFilename || `nuotrauka-${index + 1}.jpg`,
+      content: fs.createReadStream(file.filepath),
+    }));
+
+    const gmailUser = process.env.GMAIL_USER;
+    const gmailPassword = process.env.GMAIL_APP_PASSWORD;
+
+    if (!gmailUser || !gmailPassword) {
+      return res.status(500).json({
+        message: "Trūksta Gmail prisijungimo duomenų Vercel Environment Variables",
+      });
+    }
 
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
+        user: gmailUser,
+        pass: gmailPassword.replace(/\s/g, ""),
       },
     });
 
     await transporter.sendMail({
-      from: process.env.GMAIL_USER,
+      from: `"AutoSupirkimas" <${gmailUser}>`,
       to: "pirkparduokautolt@gmail.com",
       subject: "Nauja automobilio supirkimo užklausa",
       html: `
