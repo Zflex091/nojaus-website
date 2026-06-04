@@ -13,32 +13,25 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  const form = formidable({
-    multiples: true,
-    maxFileSize: 10 * 1024 * 1024,
-  });
+  try {
+    const form = formidable({
+      multiples: true,
+      maxFileSize: 10 * 1024 * 1024,
+    });
 
-  form.parse(req, async (err, fields, files) => {
-    if (err) {
-      return res.status(500).json({ message: "Nepavyko apdoroti formos" });
-    }
+    const [fields, files] = await form.parse(req);
 
-    const attachments = [];
+    const photos = files.photos || [];
+    const fileArray = Array.isArray(photos) ? photos : [photos];
 
-    const uploadedFiles = files.photos;
+    const attachments = fileArray
+      .filter(Boolean)
+      .map((file) => ({
+        filename: file.originalFilename || "nuotrauka.jpg",
+        content: fs.createReadStream(file.filepath),
+      }));
 
-    if (uploadedFiles) {
-      const fileArray = Array.isArray(uploadedFiles)
-        ? uploadedFiles
-        : [uploadedFiles];
-
-      fileArray.forEach((file) => {
-        attachments.push({
-          filename: file.originalFilename,
-          content: fs.createReadStream(file.filepath),
-        });
-      });
-    }
+    const getValue = (value) => Array.isArray(value) ? value[0] : value || "";
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -54,18 +47,24 @@ export default async function handler(req, res) {
       subject: "Nauja automobilio supirkimo užklausa",
       html: `
         <h2>Nauja automobilio supirkimo užklausa</h2>
-        <p><b>Markė:</b> ${fields.marke || ""}</p>
-        <p><b>Metai:</b> ${fields.metai || ""}</p>
-        <p><b>Variklis:</b> ${fields.variklis || ""}</p>
-        <p><b>Techninė apžiūra:</b> ${fields.ta || ""}</p>
-        <p><b>Komentaras:</b> ${fields.komentaras || ""}</p>
-        <p><b>Pageidaujama kaina:</b> ${fields.kaina || ""}</p>
-        <p><b>Miestas:</b> ${fields.miestas || ""}</p>
-        <p><b>Telefono numeris:</b> ${fields.telefonas || ""}</p>
+        <p><b>Markė:</b> ${getValue(fields.marke)}</p>
+        <p><b>Metai:</b> ${getValue(fields.metai)}</p>
+        <p><b>Variklis:</b> ${getValue(fields.variklis)}</p>
+        <p><b>Techninė apžiūra:</b> ${getValue(fields.ta)}</p>
+        <p><b>Komentaras:</b> ${getValue(fields.komentaras)}</p>
+        <p><b>Pageidaujama kaina:</b> ${getValue(fields.kaina)}</p>
+        <p><b>Miestas:</b> ${getValue(fields.miestas)}</p>
+        <p><b>Telefono numeris:</b> ${getValue(fields.telefonas)}</p>
       `,
       attachments,
     });
 
     return res.status(200).json({ message: "Forma išsiųsta sėkmingai" });
-  });
+  } catch (error) {
+    console.error("SEND ERROR:", error);
+    return res.status(500).json({
+      message: "Serverio klaida",
+      error: error.message,
+    });
+  }
 }
