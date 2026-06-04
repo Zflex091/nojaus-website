@@ -1,70 +1,53 @@
-import nodemailer from "nodemailer";
-import formidable from "formidable";
-import fs from "fs";
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
+  setIsSending(true);
+  setFormStatus("");
 
   try {
-    const form = formidable({
-      multiples: true,
-      maxFileSize: 10 * 1024 * 1024,
+    const formData = new FormData();
+
+    formData.append("marke", marke);
+    formData.append("metai", metai);
+    formData.append("variklis", variklis);
+    formData.append("ta", technineApziura);
+    formData.append("komentaras", komentaras);
+    formData.append("kaina", pageidaujamaKaina);
+    formData.append("miestas", miestas);
+    formData.append("telefonas", telefonas);
+
+    images.forEach((img) => {
+      formData.append("photos", img.file);
     });
 
-    const [fields, files] = await form.parse(req);
-
-    const photos = files.photos || [];
-    const fileArray = Array.isArray(photos) ? photos : [photos];
-
-    const attachments = fileArray
-      .filter(Boolean)
-      .map((file) => ({
-        filename: file.originalFilename || "nuotrauka.jpg",
-        content: fs.createReadStream(file.filepath),
-      }));
-
-    const getValue = (value) => Array.isArray(value) ? value[0] : value || "";
-
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
+    const response = await fetch("/api/send", {
+      method: "POST",
+      body: formData,
     });
 
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: "pirkparduokautolt@gmail.com",
-      subject: "Nauja automobilio supirkimo užklausa",
-      html: `
-        <h2>Nauja automobilio supirkimo užklausa</h2>
-        <p><b>Markė:</b> ${getValue(fields.marke)}</p>
-        <p><b>Metai:</b> ${getValue(fields.metai)}</p>
-        <p><b>Variklis:</b> ${getValue(fields.variklis)}</p>
-        <p><b>Techninė apžiūra:</b> ${getValue(fields.ta)}</p>
-        <p><b>Komentaras:</b> ${getValue(fields.komentaras)}</p>
-        <p><b>Pageidaujama kaina:</b> ${getValue(fields.kaina)}</p>
-        <p><b>Miestas:</b> ${getValue(fields.miestas)}</p>
-        <p><b>Telefono numeris:</b> ${getValue(fields.telefonas)}</p>
-      `,
-      attachments,
-    });
+    if (!response.ok) {
+      throw new Error("Nepavyko išsiųsti");
+    }
 
-    return res.status(200).json({ message: "Forma išsiųsta sėkmingai" });
+    setFormStatus(
+      "✅ Forma sėkmingai išsiųsta. Netrukus su jumis susisieksime."
+    );
+
+    setImages([]);
+
+    setMarke("");
+    setMetai("");
+    setVariklis("");
+    setTechnineApziura("");
+    setKomentaras("");
+    setPageidaujamaKaina("");
+    setMiestas("");
+    setTelefonas("");
   } catch (error) {
-    console.error("SEND ERROR:", error);
-    return res.status(500).json({
-      message: "Serverio klaida",
-      error: error.message,
-    });
+    setFormStatus(
+      "❌ Įvyko klaida. Bandykite dar kartą arba susisiekite telefonu."
+    );
+  } finally {
+    setIsSending(false);
   }
-}
+};
