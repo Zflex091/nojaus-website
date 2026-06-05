@@ -34,15 +34,92 @@ function App() {
   const [miestas, setMiestas] = useState("");
   const [telefonas, setTelefonas] = useState("");
 
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
+  const compressImage = (file, maxWidth = 1200, quality = 0.68) => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith("image/")) {
+        reject(new Error("Failas nėra nuotrauka"));
+        return;
+      }
 
-    const newImages = files.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
+      const image = new Image();
+      const reader = new FileReader();
 
-    setImages((prev) => [...prev, ...newImages].slice(0, 10));
+      reader.onload = (event) => {
+        image.src = event.target.result;
+      };
+
+      reader.onerror = () => reject(new Error("Nepavyko nuskaityti nuotraukos"));
+
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(maxWidth / image.width, 1);
+
+        canvas.width = Math.round(image.width * scale);
+        canvas.height = Math.round(image.height * scale);
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("Nepavyko suspausti nuotraukos"));
+              return;
+            }
+
+            const compressedFile = new File(
+              [blob],
+              file.name.replace(/\.[^/.]+$/, ".jpg"),
+              {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              }
+            );
+
+            resolve(compressedFile);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+
+      image.onerror = () =>
+        reject(new Error("Nepavyko apdoroti šios nuotraukos"));
+
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = async (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    const freeSlots = 10 - images.length;
+    const filesToProcess = selectedFiles.slice(0, freeSlots);
+
+    if (freeSlots <= 0) {
+      alert("Galima įkelti iki 10 nuotraukų.");
+      e.target.value = "";
+      return;
+    }
+
+    try {
+      const processedImages = await Promise.all(
+        filesToProcess.map(async (file) => {
+          const compressedFile = await compressImage(file);
+
+          return {
+            file: compressedFile,
+            preview: URL.createObjectURL(compressedFile),
+          };
+        })
+      );
+
+      setImages((prev) => [...prev, ...processedImages].slice(0, 10));
+    } catch (error) {
+      alert(
+        "Nepavyko apdoroti vienos iš nuotraukų. Bandykite įkelti kitą nuotrauką."
+      );
+    }
+
     e.target.value = "";
   };
 
@@ -56,22 +133,22 @@ function App() {
     setIsSending(true);
     setFormStatus("");
 
+    const formData = new FormData();
+
+    formData.append("marke", marke);
+    formData.append("metai", metai);
+    formData.append("variklis", variklis);
+    formData.append("ta", technineApziura);
+    formData.append("komentaras", komentaras);
+    formData.append("kaina", pageidaujamaKaina);
+    formData.append("miestas", miestas);
+    formData.append("telefonas", telefonas);
+
+    images.forEach((img) => {
+      formData.append("photos", img.file);
+    });
+
     try {
-      const formData = new FormData();
-
-      formData.append("marke", marke);
-      formData.append("metai", metai);
-      formData.append("variklis", variklis);
-      formData.append("ta", technineApziura);
-      formData.append("komentaras", komentaras);
-      formData.append("kaina", pageidaujamaKaina);
-      formData.append("miestas", miestas);
-      formData.append("telefonas", telefonas);
-
-      images.forEach((img) => {
-        formData.append("photos", img.file);
-      });
-
       const response = await fetch("/api/send", {
         method: "POST",
         body: formData,
@@ -81,7 +158,9 @@ function App() {
         throw new Error("Nepavyko išsiųsti");
       }
 
-      setFormStatus("✅ Forma sėkmingai išsiųsta. Netrukus su jumis susisieksime.");
+      setFormStatus(
+        "✅ Forma sėkmingai išsiųsta. Netrukus su jumis susisieksime."
+      );
 
       setImages([]);
       setMarke("");
@@ -93,7 +172,9 @@ function App() {
       setMiestas("");
       setTelefonas("");
     } catch (error) {
-      setFormStatus("❌ Įvyko klaida. Bandykite dar kartą arba susisiekite telefonu.");
+      setFormStatus(
+        "❌ Įvyko klaida. Bandykite dar kartą arba susisiekite telefonu."
+      );
     } finally {
       setIsSending(false);
     }
@@ -103,14 +184,7 @@ function App() {
     <>
       <header className="header">
         <a href="#pradzia" className="logo">
-          <img
-  src={logoMain}
-  alt="Auto supirkimas"
-  style={{
-    width: "200px",
-    height: "120px",
-  }}
-/>
+          <img src={logoMain} alt="Auto supirkimas" />
         </a>
 
         <nav className={menuOpen ? "nav active" : "nav"}>
@@ -121,7 +195,7 @@ function App() {
           <a href="#kontaktai" onClick={() => setMenuOpen(false)}>Kontaktai</a>
         </nav>
 
-        <a className="callBtn" href="tel:+370 674 59793">
+        <a className="callBtn" href="tel:+37064038274">
           <Phone size={18} /> Skambinti
         </a>
 
@@ -468,8 +542,8 @@ function App() {
             </div>
 
             <div className="contactInfo">
-              <a href="tel:+370 674 59793">
-                <Phone /> +370 674 59793
+              <a href="tel:+37064038274">
+                <Phone /> +370 640 38274
               </a>
 
               <a href="mailto:pirkparduokautolt@gmail.com">
@@ -488,7 +562,7 @@ function App() {
         </section>
       </main>
 
-      <a className="floatingPhone" href="tel:+370 674 59793">
+      <a className="floatingPhone" href="tel:+37064038274">
         <Phone />
       </a>
 
