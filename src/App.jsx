@@ -188,7 +188,14 @@ function App() {
     <>
       <header className="header">
         <a href="#pradzia" className="logo">
-          <img src={logoMain} alt="Auto supirkimas" />
+          <img
+  src={logoMain}
+  alt="Auto supirkimas"
+  style={{
+    width: "200px",
+    height: "120px",
+  }}
+/>
         </a>
 
         <nav className={menuOpen ? "nav active" : "nav"}>
