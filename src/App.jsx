@@ -34,14 +34,14 @@ function App() {
   const [miestas, setMiestas] = useState("");
   const [telefonas, setTelefonas] = useState("");
 
-  const compressImage = (file, maxWidth = 1600, quality = 0.72) => {
+  const compressImage = (file) => {
     return new Promise((resolve) => {
       if (!file || !file.type.startsWith("image/")) {
         resolve(file);
         return;
       }
 
-      if (file.size < 900 * 1024) {
+      if (file.size <= 900 * 1024) {
         resolve(file);
         return;
       }
@@ -57,16 +57,15 @@ function App() {
 
       image.onload = () => {
         try {
+          const maxWidth = 1000;
           const scale = Math.min(maxWidth / image.width, 1);
-          const width = Math.round(image.width * scale);
-          const height = Math.round(image.height * scale);
 
           const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
+          canvas.width = Math.round(image.width * scale);
+          canvas.height = Math.round(image.height * scale);
 
           const ctx = canvas.getContext("2d");
-          ctx.drawImage(image, 0, 0, width, height);
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
 
           canvas.toBlob(
             (blob) => {
@@ -87,7 +86,7 @@ function App() {
               resolve(compressedFile);
             },
             "image/jpeg",
-            quality
+            0.6
           );
         } catch {
           resolve(file);
@@ -95,6 +94,7 @@ function App() {
       };
 
       image.onerror = () => resolve(file);
+
       reader.readAsDataURL(file);
     });
   };
@@ -109,27 +109,10 @@ function App() {
       return;
     }
 
-    const filesToProcess = selectedFiles
-      .filter((file) => {
-        const name = file.name.toLowerCase();
-        return (
-          file.type.startsWith("image/") ||
-          name.endsWith(".jpg") ||
-          name.endsWith(".jpeg") ||
-          name.endsWith(".png") ||
-          name.endsWith(".webp")
-        );
-      })
-      .slice(0, freeSlots);
-
-    if (filesToProcess.length === 0) {
-      alert("Pasirinkite JPG, PNG arba WEBP formato nuotrauką.");
-      e.target.value = "";
-      return;
-    }
+    const filesToAdd = selectedFiles.slice(0, freeSlots);
 
     const processedImages = await Promise.all(
-      filesToProcess.map(async (file) => {
+      filesToAdd.map(async (file) => {
         const finalFile = await compressImage(file);
 
         return {
@@ -174,23 +157,28 @@ function App() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error("Nepavyko išsiųsti");
+      if (response.status >= 200 && response.status < 300) {
+        setFormStatus(
+          "✅ Forma sėkmingai išsiųsta. Netrukus su jumis susisieksime."
+        );
+
+        setImages([]);
+        setMarke("");
+        setMetai("");
+        setVariklis("");
+        setTechnineApziura("");
+        setKomentaras("");
+        setPageidaujamaKaina("");
+        setMiestas("");
+        setTelefonas("");
+        return;
       }
 
-      setFormStatus("✅ Forma sėkmingai išsiųsta. Netrukus su jumis susisieksime.");
-
-      setImages([]);
-      setMarke("");
-      setMetai("");
-      setVariklis("");
-      setTechnineApziura("");
-      setKomentaras("");
-      setPageidaujamaKaina("");
-      setMiestas("");
-      setTelefonas("");
+      throw new Error("Nepavyko išsiųsti");
     } catch {
-      setFormStatus("❌ Įvyko klaida. Bandykite dar kartą arba susisiekite telefonu.");
+      setFormStatus(
+        "❌ Įvyko klaida. Bandykite dar kartą arba susisiekite telefonu."
+      );
     } finally {
       setIsSending(false);
     }
@@ -200,14 +188,7 @@ function App() {
     <>
       <header className="header">
         <a href="#pradzia" className="logo">
-          <img
-  src={logoMain}
-  alt="Auto supirkimas"
-  style={{
-    width: "200px",
-    height: "120px",
-  }}
-/>
+          <img src={logoMain} alt="Auto supirkimas" />
         </a>
 
         <nav className={menuOpen ? "nav active" : "nav"}>
@@ -431,8 +412,8 @@ function App() {
               <h3>Tvarkingus automobilius</h3>
 
               <p>
-                Automobilius, kurie išsaugojo savo kokybę laikui bėgant. Net
-                jei turi smulkių defektų, pateikiame konkurencingą pasiūlymą.
+                Automobilius, kurie išsaugojo savo kokybę laikui bėgant. Net jei
+                turi smulkių defektų, pateikiame konkurencingą pasiūlymą.
               </p>
             </motion.div>
 
