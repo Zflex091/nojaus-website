@@ -34,66 +34,74 @@ function App() {
   const [miestas, setMiestas] = useState("");
   const [telefonas, setTelefonas] = useState("");
 
-  const compressImage = (file, maxWidth = 1200, quality = 0.68) => {
-    return new Promise((resolve, reject) => {
-      if (!file.type.startsWith("image/")) {
-        reject(new Error("Failas nėra nuotrauka"));
+  const compressImage = (file, maxWidth = 1600, quality = 0.72) => {
+    return new Promise((resolve) => {
+      if (!file || !file.type.startsWith("image/")) {
+        resolve(file);
         return;
       }
 
-      const image = new Image();
+      if (file.size < 900 * 1024) {
+        resolve(file);
+        return;
+      }
+
       const reader = new FileReader();
+      const image = new Image();
 
       reader.onload = (event) => {
         image.src = event.target.result;
       };
 
-      reader.onerror = () => reject(new Error("Nepavyko nuskaityti nuotraukos"));
+      reader.onerror = () => resolve(file);
 
       image.onload = () => {
-        const canvas = document.createElement("canvas");
-        const scale = Math.min(maxWidth / image.width, 1);
+        try {
+          const scale = Math.min(maxWidth / image.width, 1);
+          const width = Math.round(image.width * scale);
+          const height = Math.round(image.height * scale);
 
-        canvas.width = Math.round(image.width * scale);
-        canvas.height = Math.round(image.height * scale);
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
 
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(image, 0, 0, width, height);
 
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error("Nepavyko suspausti nuotraukos"));
-              return;
-            }
-
-            const compressedFile = new File(
-              [blob],
-              file.name.replace(/\.[^/.]+$/, ".jpg"),
-              {
-                type: "image/jpeg",
-                lastModified: Date.now(),
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                resolve(file);
+                return;
               }
-            );
 
-            resolve(compressedFile);
-          },
-          "image/jpeg",
-          quality
-        );
+              const compressedFile = new File(
+                [blob],
+                file.name.replace(/\.[^/.]+$/, ".jpg"),
+                {
+                  type: "image/jpeg",
+                  lastModified: Date.now(),
+                }
+              );
+
+              resolve(compressedFile);
+            },
+            "image/jpeg",
+            quality
+          );
+        } catch {
+          resolve(file);
+        }
       };
 
-      image.onerror = () =>
-        reject(new Error("Nepavyko apdoroti šios nuotraukos"));
-
+      image.onerror = () => resolve(file);
       reader.readAsDataURL(file);
     });
   };
 
   const handleImageUpload = async (e) => {
-    const selectedFiles = Array.from(e.target.files);
+    const selectedFiles = Array.from(e.target.files || []);
     const freeSlots = 10 - images.length;
-    const filesToProcess = selectedFiles.slice(0, freeSlots);
 
     if (freeSlots <= 0) {
       alert("Galima įkelti iki 10 nuotraukų.");
@@ -101,25 +109,37 @@ function App() {
       return;
     }
 
-    try {
-      const processedImages = await Promise.all(
-        filesToProcess.map(async (file) => {
-          const compressedFile = await compressImage(file);
+    const filesToProcess = selectedFiles
+      .filter((file) => {
+        const name = file.name.toLowerCase();
+        return (
+          file.type.startsWith("image/") ||
+          name.endsWith(".jpg") ||
+          name.endsWith(".jpeg") ||
+          name.endsWith(".png") ||
+          name.endsWith(".webp")
+        );
+      })
+      .slice(0, freeSlots);
 
-          return {
-            file: compressedFile,
-            preview: URL.createObjectURL(compressedFile),
-          };
-        })
-      );
-
-      setImages((prev) => [...prev, ...processedImages].slice(0, 10));
-    } catch (error) {
-      alert(
-        "Nepavyko apdoroti vienos iš nuotraukų. Bandykite įkelti kitą nuotrauką."
-      );
+    if (filesToProcess.length === 0) {
+      alert("Pasirinkite JPG, PNG arba WEBP formato nuotrauką.");
+      e.target.value = "";
+      return;
     }
 
+    const processedImages = await Promise.all(
+      filesToProcess.map(async (file) => {
+        const finalFile = await compressImage(file);
+
+        return {
+          file: finalFile,
+          preview: URL.createObjectURL(finalFile),
+        };
+      })
+    );
+
+    setImages((prev) => [...prev, ...processedImages].slice(0, 10));
     e.target.value = "";
   };
 
@@ -158,9 +178,7 @@ function App() {
         throw new Error("Nepavyko išsiųsti");
       }
 
-      setFormStatus(
-        "✅ Forma sėkmingai išsiųsta. Netrukus su jumis susisieksime."
-      );
+      setFormStatus("✅ Forma sėkmingai išsiųsta. Netrukus su jumis susisieksime.");
 
       setImages([]);
       setMarke("");
@@ -171,10 +189,8 @@ function App() {
       setPageidaujamaKaina("");
       setMiestas("");
       setTelefonas("");
-    } catch (error) {
-      setFormStatus(
-        "❌ Įvyko klaida. Bandykite dar kartą arba susisiekite telefonu."
-      );
+    } catch {
+      setFormStatus("❌ Įvyko klaida. Bandykite dar kartą arba susisiekite telefonu.");
     } finally {
       setIsSending(false);
     }
@@ -184,14 +200,7 @@ function App() {
     <>
       <header className="header">
         <a href="#pradzia" className="logo">
-          <img
-  src={logoMain}
-  alt="Auto supirkimas"
-  style={{
-    width: "200px",
-    height: "120px",
-  }}
-/>
+          <img src={logoMain} alt="Auto supirkimas" />
         </a>
 
         <nav className={menuOpen ? "nav active" : "nav"}>
@@ -318,7 +327,7 @@ function App() {
                 <input
                   type="file"
                   multiple
-                  accept="image/*"
+                  accept="image/*,.jpg,.jpeg,.png,.webp"
                   onChange={handleImageUpload}
                 />
 
