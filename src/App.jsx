@@ -24,6 +24,7 @@ function App() {
   const [images, setImages] = useState([]);
   const [formStatus, setFormStatus] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isProcessingImages, setIsProcessingImages] = useState(false);
 
   const [marke, setMarke] = useState("");
   const [metai, setMetai] = useState("");
@@ -48,12 +49,7 @@ function App() {
   const compressImage = (file) => {
     return new Promise((resolve) => {
       if (!file || !isImageFile(file)) {
-        resolve(file);
-        return;
-      }
-
-      if (file.size <= 900 * 1024) {
-        resolve(file);
+        resolve(null);
         return;
       }
 
@@ -69,7 +65,7 @@ function App() {
 
       image.onload = () => {
         try {
-          const maxWidth = 800;
+          const maxWidth = 650;
           const scale = Math.min(maxWidth / image.width, 1);
 
           const canvas = document.createElement("canvas");
@@ -94,7 +90,9 @@ function App() {
 
               const compressedFile = new File(
                 [blob],
-                file.name.replace(/\.[^/.]+$/, ".jpg"),
+                `nuotrauka-${Date.now()}-${Math.random()
+                  .toString(36)
+                  .slice(2)}.jpg`,
                 {
                   type: "image/jpeg",
                   lastModified: Date.now(),
@@ -104,7 +102,7 @@ function App() {
               resolve(compressedFile);
             },
             "image/jpeg",
-            0.45
+            0.38
           );
         } catch {
           resolve(file);
@@ -133,29 +131,47 @@ function App() {
       return;
     }
 
-    const processedImages = await Promise.all(
-      validFiles.map(async (file) => {
-        const finalFile = await compressImage(file);
+    setIsProcessingImages(true);
 
-        return {
-          file: finalFile,
-          preview: URL.createObjectURL(finalFile),
-        };
-      })
-    );
+    try {
+      const processedImages = [];
 
-    setImages((prev) => [...prev, ...processedImages].slice(0, 10));
-    e.target.value = "";
+      for (const file of validFiles) {
+        const compressedFile = await compressImage(file);
+
+        if (compressedFile) {
+          processedImages.push({
+            file: compressedFile,
+            preview: URL.createObjectURL(compressedFile),
+          });
+        }
+      }
+
+      setImages((prev) => [...prev, ...processedImages].slice(0, 10));
+    } catch {
+      alert("Nepavyko apdoroti nuotraukų. Bandykite dar kartą.");
+    } finally {
+      setIsProcessingImages(false);
+      e.target.value = "";
+    }
   };
 
   const removeImage = (indexToRemove) => {
-    setImages((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setImages((prev) => {
+      const imageToRemove = prev[indexToRemove];
+
+      if (imageToRemove?.preview) {
+        URL.revokeObjectURL(imageToRemove.preview);
+      }
+
+      return prev.filter((_, index) => index !== indexToRemove);
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (isSending) return;
+    if (isSending || isProcessingImages) return;
 
     setIsSending(true);
     setFormStatus("");
@@ -171,7 +187,7 @@ function App() {
     formData.append("miestas", miestas);
     formData.append("telefonas", telefonas);
 
-    images.forEach((img) => {
+    images.slice(0, 10).forEach((img) => {
       formData.append("photos", img.file);
     });
 
@@ -189,7 +205,9 @@ function App() {
         "✅ Forma sėkmingai išsiųsta. Netrukus su jumis susisieksime."
       );
 
-      images.forEach((img) => URL.revokeObjectURL(img.preview));
+      images.forEach((img) => {
+        if (img.preview) URL.revokeObjectURL(img.preview);
+      });
 
       setImages([]);
       setMarke("");
@@ -217,11 +235,21 @@ function App() {
         </a>
 
         <nav className={menuOpen ? "nav active" : "nav"}>
-          <a href="#pradzia" onClick={() => setMenuOpen(false)}>Pradžia</a>
-          <a href="#superkame" onClick={() => setMenuOpen(false)}>Superkame</a>
-          <a href="#sandoris" onClick={() => setMenuOpen(false)}>Sandoris</a>
-          <a href="#apie" onClick={() => setMenuOpen(false)}>Apie mus</a>
-          <a href="#kontaktai" onClick={() => setMenuOpen(false)}>Kontaktai</a>
+          <a href="#pradzia" onClick={() => setMenuOpen(false)}>
+            Pradžia
+          </a>
+          <a href="#superkame" onClick={() => setMenuOpen(false)}>
+            Superkame
+          </a>
+          <a href="#sandoris" onClick={() => setMenuOpen(false)}>
+            Sandoris
+          </a>
+          <a href="#apie" onClick={() => setMenuOpen(false)}>
+            Apie mus
+          </a>
+          <a href="#kontaktai" onClick={() => setMenuOpen(false)}>
+            Kontaktai
+          </a>
         </nav>
 
         <a className="callBtn" href="tel:+37064038274">
@@ -266,10 +294,12 @@ function App() {
                   <strong>24h</strong>
                   <span>greitas įvertinimas</span>
                 </div>
+
                 <div>
                   <strong>100%</strong>
                   <span>aiškus procesas</span>
                 </div>
+
                 <div>
                   <strong>LT</strong>
                   <span>dirbame visoje Lietuvoje</span>
@@ -342,10 +372,13 @@ function App() {
                   multiple
                   accept="image/*,.jpg,.jpeg,.png,.webp"
                   onChange={handleImageUpload}
+                  disabled={isProcessingImages || isSending}
                 />
 
                 <span>
-                  {images.length > 0
+                  {isProcessingImages
+                    ? "Nuotraukos ruošiamos..."
+                    : images.length > 0
                     ? `Pasirinkta nuotraukų: ${images.length}/10`
                     : "Automobilio nuotraukos iki 10 vnt."}
                 </span>
@@ -354,7 +387,7 @@ function App() {
               {images.length > 0 && (
                 <div className="previewGrid">
                   {images.map((img, index) => (
-                    <div className="previewItem" key={index}>
+                    <div className="previewItem" key={img.preview || index}>
                       <img
                         src={img.preview}
                         alt={`Automobilio nuotrauka ${index + 1}`}
@@ -365,6 +398,7 @@ function App() {
                         type="button"
                         className="removeImage"
                         onClick={() => removeImage(index)}
+                        disabled={isSending}
                       >
                         ×
                       </button>
@@ -401,8 +435,12 @@ function App() {
                 required
               />
 
-              <button type="submit" disabled={isSending}>
-                {isSending ? "SIUNČIAMA..." : "SIŲSTI"}
+              <button type="submit" disabled={isSending || isProcessingImages}>
+                {isSending
+                  ? "SIUNČIAMA..."
+                  : isProcessingImages
+                  ? "RUOŠIAMOS NUOTRAUKOS..."
+                  : "SIŲSTI"}
               </button>
 
               {formStatus && <p className="formStatus">{formStatus}</p>}
