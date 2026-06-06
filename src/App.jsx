@@ -34,9 +34,20 @@ function App() {
   const [miestas, setMiestas] = useState("");
   const [telefonas, setTelefonas] = useState("");
 
+  const isImageFile = (file) => {
+    const name = file.name.toLowerCase();
+    return (
+      file.type.startsWith("image/") ||
+      name.endsWith(".jpg") ||
+      name.endsWith(".jpeg") ||
+      name.endsWith(".png") ||
+      name.endsWith(".webp")
+    );
+  };
+
   const compressImage = (file) => {
     return new Promise((resolve) => {
-      if (!file || !file.type.startsWith("image/")) {
+      if (!file || !isImageFile(file)) {
         resolve(file);
         return;
       }
@@ -54,10 +65,11 @@ function App() {
       };
 
       reader.onerror = () => resolve(file);
+      image.onerror = () => resolve(file);
 
       image.onload = () => {
         try {
-          const maxWidth = 1000;
+          const maxWidth = 1200;
           const scale = Math.min(maxWidth / image.width, 1);
 
           const canvas = document.createElement("canvas");
@@ -65,6 +77,12 @@ function App() {
           canvas.height = Math.round(image.height * scale);
 
           const ctx = canvas.getContext("2d");
+
+          if (!ctx) {
+            resolve(file);
+            return;
+          }
+
           ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
 
           canvas.toBlob(
@@ -86,14 +104,12 @@ function App() {
               resolve(compressedFile);
             },
             "image/jpeg",
-            0.6
+            0.65
           );
         } catch {
           resolve(file);
         }
       };
-
-      image.onerror = () => resolve(file);
 
       reader.readAsDataURL(file);
     });
@@ -109,10 +125,16 @@ function App() {
       return;
     }
 
-    const filesToAdd = selectedFiles.slice(0, freeSlots);
+    const validFiles = selectedFiles.filter(isImageFile).slice(0, freeSlots);
+
+    if (validFiles.length === 0) {
+      alert("Pasirinkite JPG, JPEG, PNG arba WEBP formato nuotraukas.");
+      e.target.value = "";
+      return;
+    }
 
     const processedImages = await Promise.all(
-      filesToAdd.map(async (file) => {
+      validFiles.map(async (file) => {
         const finalFile = await compressImage(file);
 
         return {
@@ -132,6 +154,8 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (isSending) return;
 
     setIsSending(true);
     setFormStatus("");
@@ -157,24 +181,25 @@ function App() {
         body: formData,
       });
 
-      if (response.status >= 200 && response.status < 300) {
-        setFormStatus(
-          "✅ Forma sėkmingai išsiųsta. Netrukus su jumis susisieksime."
-        );
-
-        setImages([]);
-        setMarke("");
-        setMetai("");
-        setVariklis("");
-        setTechnineApziura("");
-        setKomentaras("");
-        setPageidaujamaKaina("");
-        setMiestas("");
-        setTelefonas("");
-        return;
+      if (!response.ok) {
+        throw new Error("Nepavyko išsiųsti");
       }
 
-      throw new Error("Nepavyko išsiųsti");
+      setFormStatus(
+        "✅ Forma sėkmingai išsiųsta. Netrukus su jumis susisieksime."
+      );
+
+      images.forEach((img) => URL.revokeObjectURL(img.preview));
+
+      setImages([]);
+      setMarke("");
+      setMetai("");
+      setVariklis("");
+      setTechnineApziura("");
+      setKomentaras("");
+      setPageidaujamaKaina("");
+      setMiestas("");
+      setTelefonas("");
     } catch {
       setFormStatus(
         "❌ Įvyko klaida. Bandykite dar kartą arba susisiekite telefonu."
@@ -188,14 +213,7 @@ function App() {
     <>
       <header className="header">
         <a href="#pradzia" className="logo">
-          <img
-  src={logoMain}
-  alt="Auto supirkimas"
-  style={{
-    width: "200px",
-    height: "120px",
-  }}
-/>
+          <img src={logoMain} alt="Auto supirkimas" />
         </a>
 
         <nav className={menuOpen ? "nav active" : "nav"}>
