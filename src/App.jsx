@@ -69,7 +69,7 @@ function App() {
 
       image.onload = () => {
         try {
-          const maxWidth = 1200;
+          const maxWidth = 800;
           const scale = Math.min(maxWidth / image.width, 1);
 
           const canvas = document.createElement("canvas");
@@ -104,7 +104,7 @@ function App() {
               resolve(compressedFile);
             },
             "image/jpeg",
-            0.65
+            0.45
           );
         } catch {
           resolve(file);
