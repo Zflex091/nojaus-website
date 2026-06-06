@@ -925,4 +925,52 @@ footer div {
   opacity: 0.75;
   cursor: not-allowed;
 }
+@media (min-width: 1024px) {
+  .hero {
+    padding-top: 120px !important;
+    min-height: auto !important;
+  }
+
+  .heroContent {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 560px !important;
+    align-items: start !important;
+    gap: 56px !important;
+    max-width: 1420px !important;
+    margin: 0 auto !important;
+    padding: 80px 48px !important;
+  }
+
+  .heroText {
+    padding-top: 90px !important;
+  }
+
+  .heroText h1 {
+    font-size: clamp(64px, 6vw, 104px) !important;
+    line-height: 0.95 !important;
+    margin: 0 0 28px !important;
+  }
+
+  .formBox {
+    margin-top: 0 !important;
+    max-width: 560px !important;
+    width: 100% !important;
+    align-self: start !important;
+  }
+
+  .previewGrid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .previewItem {
+    height: 92px !important;
+  }
+
+  .previewImage {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+}
 }
